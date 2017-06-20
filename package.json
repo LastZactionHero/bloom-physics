@@ -1,0 +1,13 @@
+{
+  "name": "bloom-physics",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "babel": "^6.23.0",
+    "babel-core": "^6.24.1",
+    "babel-loader": "^7.0.0",
+    "matter-js": "^0.12.0",
+    "webpack": "^2.6.1"
+  }
+}
