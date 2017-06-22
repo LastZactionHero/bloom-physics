@@ -1157,6 +1157,10 @@ loose-envify@^1.0.0:
   dependencies:
     js-tokens "^3.0.0"
 
+matter-attractors@^0.1.6:
+  version "0.1.6"
+  resolved "https://registry.yarnpkg.com/matter-attractors/-/matter-attractors-0.1.6.tgz#f87ba132fb6cf1e58f267c6d8ffc590768683989"
+
 matter-js@^0.12.0:
   version "0.12.0"
   resolved "https://registry.yarnpkg.com/matter-js/-/matter-js-0.12.0.tgz#dcb02d04326c47746c63a3772d1475753d72fe1e"
