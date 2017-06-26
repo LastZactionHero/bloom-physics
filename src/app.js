@@ -8,17 +8,104 @@ function plantAreaFt2(plant) {
   return Math.PI * Math.pow(avgWidthFt / 2, 2)
 }
 
-const bedDimensions = { width: 30, depth: 6 }
-const bedArea = bedDimensions.width * bedDimensions.depth;
+var Engine = Matter.Engine,
+    Render = Matter.Render,
+    World = Matter.World,
+    Bodies = Matter.Bodies,
+    Events = Matter.Events;
 
-// Load Combination Templates from API
+// create an engine
+window.engine = Engine.create();
+engine.world.gravity.x = 2;
+engine.world.gravity.y = 0;
+
+const CANVAS_WIDTH = 1200;
+const CANVAS_HEIGHT = 1200;
+
+// create a renderer
+var render = Render.create({
+    element: document.body,
+    engine: engine,
+    options: {
+      width: CANVAS_WIDTH,
+      height: CANVAS_HEIGHT
+    }
+});
+
+
+const bedDimensions = { width: 15, depth: 5 } // feet
+const bedArea = bedDimensions.width * bedDimensions.depth; // feet^2
+
+const BOUNDARY_BUFFER = 400;
+
+const COLOR_CHUTE = "#2c3e50";
+const COLOR_CHUTE_EXT = "#95a5a6";
+
+// const bodyBed = Bodies.rectangle(
+//   CANVAS_WIDTH / 2,
+//   CANVAS_HEIGHT / 2,
+//   bedDimensions.width * 12,
+//   bedDimensions.depth * 12,
+//   { render: { fillStyle: '#FFFFFF' } });
+// World.add(engine.world, bodyBed);
+
+
+const boundaryTop = Bodies.rectangle(
+  CANVAS_WIDTH / 2,
+  CANVAS_HEIGHT / 2 - bedDimensions.depth * 12 / 2 - BOUNDARY_BUFFER / 2,
+  bedDimensions.width * 12,
+  BOUNDARY_BUFFER,
+  { isStatic: true, render: { fillStyle: COLOR_CHUTE } });
+World.add(engine.world, boundaryTop);
+
+const boundaryBottom = Bodies.rectangle(
+  CANVAS_WIDTH / 2,
+  CANVAS_HEIGHT / 2 + bedDimensions.depth * 12 / 2 + BOUNDARY_BUFFER / 2,
+  bedDimensions.width * 12,
+  BOUNDARY_BUFFER,
+  { isStatic: true, render: { fillStyle: COLOR_CHUTE } });
+World.add(engine.world, boundaryBottom);
+
+const boundaryRight= Bodies.rectangle(
+  CANVAS_WIDTH / 2 + BOUNDARY_BUFFER / 2 + bedDimensions.width * 12 / 2,
+  CANVAS_HEIGHT / 2,
+  BOUNDARY_BUFFER,
+  BOUNDARY_BUFFER * 2 + bedDimensions.depth * 12,
+  { isStatic: true, render: { fillStyle: COLOR_CHUTE } });
+World.add(engine.world, boundaryRight);
+
+const boundaryExtTop = Bodies.rectangle(
+  CANVAS_WIDTH / 2 - bedDimensions.width * 12,
+  CANVAS_HEIGHT / 2 - bedDimensions.depth * 12 / 2 - BOUNDARY_BUFFER / 2,
+  bedDimensions.width * 12,
+  BOUNDARY_BUFFER,
+  { isStatic: true, render: { fillStyle: COLOR_CHUTE_EXT } });
+World.add(engine.world, boundaryExtTop);
+
+const boundaryExtBottom = Bodies.rectangle(
+  CANVAS_WIDTH / 2 - bedDimensions.width * 12,
+  CANVAS_HEIGHT / 2 + bedDimensions.depth * 12 / 2 + BOUNDARY_BUFFER / 2,
+  bedDimensions.width * 12,
+  BOUNDARY_BUFFER,
+  { isStatic: true, render: { fillStyle: COLOR_CHUTE_EXT } });
+World.add(engine.world, boundaryExtBottom);
+
+const boundaryCap = Bodies.rectangle(
+  CANVAS_WIDTH / 2 - bedDimensions.width * 12,
+  CANVAS_HEIGHT / 2,
+  bedDimensions.width * 12,
+  bedDimensions.depth * 12,
+  { isStatic: true, render: { fillStyle: COLOR_CHUTE } });
+
+
+// // Load Combination Templates from API
 const combinationTemplates = JSON.parse($.ajax({
   method: 'GET',
   url: 'http://api-search.plantwithbloom.com/combination_templates',
   async: false
 }).responseText);
 
-// Pick a random template and identify the plants
+// // Pick a random template and identify the plants
 const template = combinationTemplates[Math.floor(combinationTemplates.length * Math.random())]
 const plants = template.starting_plants.map( (p) => { return p.plant });
 const colors = ['#1abc9c', '#3498db', '#9b59b6', '#e74c3c']
@@ -27,9 +114,7 @@ plants.forEach( (plant, idx) => {
   plant.size.area = plantAreaFt2(plant)
 })
 
-
-
-// Pick a random CombiationProperty definition
+// // Pick a random CombiationProperty definition
 const combinationProperties = CombinationProperties[plants.length][Math.floor(CombinationProperties[plants.length].length * Math.random())]
 
 // Self-select plants into properties
@@ -73,69 +158,49 @@ plants.forEach( (plant) => {
 });
 
 
-var Engine = Matter.Engine,
-    Render = Matter.Render,
-    World = Matter.World,
-    Bodies = Matter.Bodies,
-    Events = Matter.Events;
-
-// create an engine
-window.engine = Engine.create();
-
-// create a renderer
-var render = Render.create({
-    element: document.body,
-    engine: engine
-});
-
-const BOUNDARY_SPACE = 100;
-const WORLD_WIDTH = bedDimensions.depth * 12 + 2 * BOUNDARY_SPACE;
-const WORLD_HEIGHT = bedDimensions.width * 12 + BOUNDARY_SPACE;
-
-const boundaryFloor = Bodies.rectangle(WORLD_WIDTH / 2, WORLD_HEIGHT + BOUNDARY_SPACE / 2 - 1, WORLD_WIDTH + BOUNDARY_SPACE, BOUNDARY_SPACE, { isStatic: true });
-const boundaryLeft = Bodies.rectangle(0, WORLD_HEIGHT / 2, BOUNDARY_SPACE, WORLD_HEIGHT, { isStatic: true });
-const boundaryRight = Bodies.rectangle(WORLD_WIDTH - 1, WORLD_HEIGHT / 2, BOUNDARY_SPACE, WORLD_HEIGHT, { isStatic: true });
-const boundaryCeil = Bodies.rectangle(WORLD_WIDTH / 2, 0 - BOUNDARY_SPACE / 2, WORLD_WIDTH + BOUNDARY_SPACE, BOUNDARY_SPACE, { isStatic: true });
-
-World.add(engine.world, [
-    boundaryFloor,
-    boundaryLeft,
-    boundaryRight
-
-]);
-
-engine.world.gravity.x = 0;
-engine.world.gravity.y = 3;
-
-let lastPermalink = inventory[0];
-let lastYDrop = bedDimensions.width * 12 - 10;
 let dividers = [];
+let lastPermalink = inventory[0];
+let lastXPosition = 0;
+
+const DIVIDER_SIZE = 25;
+
 inventory.forEach( (permalink, inventoryIdx) => {
   const plant = plants.find( (plant) => { return plant.permalink == permalink});
 
-  if(lastPermalink != plant.permalink) {
-    const dividerBody = Bodies.rectangle(BOUNDARY_SPACE / 2 + (170) / 2, lastYDrop - 200, 170 , 50, { label: 'divider', mass: 100 });
+  if(lastPermalink && lastPermalink != plant.permalink) {
+    lastXPosition -= DIVIDER_SIZE;
+    const dividerBody = Bodies.rectangle(lastXPosition, CANVAS_HEIGHT / 2, DIVIDER_SIZE, bedDimensions.depth * 12, { label: 'divider', mass: 10 });
     dividers.push(dividerBody)
     World.add(engine.world, dividerBody);
-
-    lastPermalink = plant.permalink;
-    lastYDrop -= 400;
+  
+    lastXPosition - 200;
+  }
+  
+  let xPosn = null;
+  if(lastXPosition == 0) {
+    xPosn = CANVAS_WIDTH / 2 + bedDimensions.width * 12 / 2 - plant.size.avg_width;
+  } else {
+    xPosn = lastXPosition -= plant.size.avg_width;
   }
 
-  const xPosn = inventoryIdx % 2 == 0 ? BOUNDARY_SPACE / 2 + plant.size.avg_width + 10 * Math.random() : WORLD_WIDTH - BOUNDARY_SPACE/2 - plant.size.avg_width - 10 * Math.random();
-  const yPosn = lastYDrop - 2 * plant.size.avg_width;
-  lastYDrop = yPosn;
+  // const yPosn = CANVAS_HEIGHT / 2 + (inventoryIdx % 2 == 0 ? (bedDimensions.depth / 2 + plant.size.avg_width / 2) : (0 - bedDimensions.depth / 2 - plant.size.avg_width / 2));
+  const yPosn = CANVAS_HEIGHT / 2 + ( inventoryIdx % 2 == 0 ? 10 * Math.random() : -10 * Math.random() )
 
-  const circleBody = Bodies.circle(xPosn, yPosn, plant.size.avg_width, { label: plant.permalink, render: { strokeStyle: plant.renderColor, lineWidth: 1, fillStyle: plant.renderColor}});
+  const circleBody = Bodies.circle(xPosn, yPosn, plant.size.avg_width / 2, { label: plant.permalink, render: { strokeStyle: plant.renderColor, lineWidth: 1, fillStyle: plant.renderColor}});
   World.add(engine.world, circleBody);
-})
+
+  lastXPosition = xPosn - plant.size.avg_width;
+  lastPermalink = plant.permalink;
+});
+
 
 let removedDividers = false;
 Events.on(engine, 'afterUpdate', (event) => {
   if(event.timestamp > 3000) {
-    World.add(engine.world, boundaryCeil);
+    
     engine.world.gravity.x = 0.0;
-    engine.world.gravity.y = -1;
+    engine.world.gravity.y = 1;
+    World.add(engine.world, boundaryCap);
   }
   if(event.timestamp > 3500) {
     if(!removedDividers) {
@@ -165,10 +230,11 @@ Events.on(engine, 'afterUpdate', (event) => {
     engine.world.gravity.y = 0.5
   }
   if(event.timestamp > 7000) {
-    engine.world.gravity.x = 0.1
-    engine.world.gravity.y = 0
+    engine.world.gravity.x = 0.0
+    engine.world.gravity.y = 0.5
   }
 });
+
 Engine.run(engine);
 
 // run the renderer
