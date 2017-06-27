@@ -10,8 +10,8 @@ export default {
   3: [
       [
         { property: 'lone', sort: 0, area: 0.50 },
-        { property: 'tall_back', sort: 1, area: 0.10 },
-        { property: 'short_front', sort: 2, area: 0.10 }
+        { property: 'tall_back', sort: 1, area: 0.20 },
+        { property: 'short_front', sort: 2, area: 0.15 }
       ],
       [
         { property: 'lone', sort: 0, area: 0.35 },
@@ -21,8 +21,8 @@ export default {
   ],
   2: [
     [
-      { property: 'tall_back', sort: 0, area: 0.65 },
-      { property: 'short_front', sort: 1, area: 0.35 }
+      { property: 'tall_back', sort: 0, area: 0.60 },
+      { property: 'short_front', sort: 1, area: 0.25 }
     ],
     [
       { property: 'lone', sort: 0, area: 0.45 },

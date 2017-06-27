@@ -12,11 +12,14 @@ var Engine = Matter.Engine,
     Render = Matter.Render,
     World = Matter.World,
     Bodies = Matter.Bodies,
-    Events = Matter.Events;
+    Events = Matter.Events,
+    Constraint = Matter.Constraint,
+    Composites = Matter.Composites,
+    Composite = Matter.Composite;
 
 // create an engine
 window.engine = Engine.create();
-engine.world.gravity.x = 2;
+engine.world.gravity.x = 0.5;
 engine.world.gravity.y = 0;
 
 const CANVAS_WIDTH = 1200;
@@ -40,15 +43,6 @@ const BOUNDARY_BUFFER = 400;
 
 const COLOR_CHUTE = "#2c3e50";
 const COLOR_CHUTE_EXT = "#95a5a6";
-
-// const bodyBed = Bodies.rectangle(
-//   CANVAS_WIDTH / 2,
-//   CANVAS_HEIGHT / 2,
-//   bedDimensions.width * 12,
-//   bedDimensions.depth * 12,
-//   { render: { fillStyle: '#FFFFFF' } });
-// World.add(engine.world, bodyBed);
-
 
 const boundaryTop = Bodies.rectangle(
   CANVAS_WIDTH / 2,
@@ -107,13 +101,20 @@ const combinationTemplates = JSON.parse($.ajax({
 
 // // Pick a random template and identify the plants
 // const template = combinationTemplates[Math.floor(combinationTemplates.length * Math.random())]
-const template  = combinationTemplates[3];
+// template-3: poor fit
+// template-4: poor picking
+// template-5: crash
+// template-6: poor picking
+// template-7: looks bad at small scale
+// Where you left off: - Improve plant selection to select by size that will fit
+//                     - Improve position_type picking algorithm 
+const template  = combinationTemplates[4];
 let plants = template.starting_plants.map( (p) => { return p.plant });
 const colors = ['#1abc9c', '#3498db', '#9b59b6', '#e74c3c']
 plants.forEach( (plant, idx) => {
   plant.renderColor = colors[idx];
   plant.size.area = plantAreaFt2(plant)
-})
+});
 
 // // Pick a random CombiationProperty definition
 // const combinationProperties = CombinationProperties[plants.length][Math.floor(CombinationProperties[plants.length].length * Math.random())]
@@ -158,6 +159,10 @@ plants.forEach( (plant) => {
     plantQuantity -= 1;
   }
 
+  if(plantQuantity < 1) {
+    debugger
+  }
+
   let inventoryPlant = []
   for(var i = 0; i < plantQuantity; i++) {
     inventoryPlant.push(plant.permalink);
@@ -170,16 +175,18 @@ plants.forEach( (plant) => {
 let dividers = [];
 let lastPermalink = inventory[0][0];
 let lastXPosition = 0;
-
-const DIVIDER_SIZE = 25;
+let tallBackStartXPosition = 0;
+const DIVIDER_SIZE = 20;
 
 inventory.forEach( (inventoryPlant, inventoryPlantIdx) => {
+  let rope = Composites.stack();
+
   inventoryPlant.forEach( (permalink, inventoryIdx) => {
     const plant = plants.find( (plant) => { return plant.permalink == permalink});
 
     if(lastPermalink && lastPermalink != plant.permalink) {
       if(plant.property_type.property == 'short_front') {
-
+        lastXPosition = tallBackStartXPosition;
       } else {
         lastXPosition -= DIVIDER_SIZE;
         const dividerBody = Bodies.rectangle(lastXPosition, CANVAS_HEIGHT / 2, DIVIDER_SIZE, bedDimensions.depth * 12, { label: 'divider', mass: 10 });
@@ -197,61 +204,62 @@ inventory.forEach( (inventoryPlant, inventoryPlantIdx) => {
       xPosn = lastXPosition -= plant.size.avg_width;
     }
 
-    // const yPosn = CANVAS_HEIGHT / 2 + (inventoryIdx % 2 == 0 ? (bedDimensions.depth / 2 + plant.size.avg_width / 2) : (0 - bedDimensions.depth / 2 - plant.size.avg_width / 2));
+    if(lastPermalink != plant.permalink && plant.property_type.property == 'tall_back') {
+      tallBackStartXPosition = xPosn;
+    }
+
     let yPosn = CANVAS_HEIGHT / 2 + ( inventoryIdx % 2 == 0 ? 10 * Math.random() : -10 * Math.random() )
     if(plant.property_type.property == 'tall_back') {
       yPosn = CANVAS_HEIGHT / 2 - (bedDimensions.depth * 12 / 2) + plant.size.avg_width / 2;
+      if(inventoryIdx % 2 == 0) {
+        yPosn += plant.size.avg_width / 2;
+      }
     } else if (plant.property_type.property == 'short_front') {
+      if(inventoryIdx % 2 == 0) {
+        yPosn += plant.size.avg_width / 2;
+      }
       yPosn = CANVAS_HEIGHT / 2 + (bedDimensions.depth * 12 / 2) - plant.size.avg_width / 2;
     }
 
     const circleBody = Bodies.circle(xPosn, yPosn, plant.size.avg_width / 2, { label: plant.permalink, render: { strokeStyle: plant.renderColor, lineWidth: 1, fillStyle: plant.renderColor}});
-    World.add(engine.world, circleBody);
 
-    lastXPosition = xPosn - plant.size.avg_width;
+    if(plant.property_type.property == 'tall_back' || plant.property_type.property == 'short_front') {
+      rope.bodies.push(circleBody);
+    } else {
+      World.add(engine.world, circleBody);
+    }
+    
+    if(rope.bodies.length > 0 && inventoryIdx == inventoryPlant.length - 1) {
+      Composites.chain(rope, 0, 0, 0, 0, { stiffness: 0.2, length: plant.size.avg_width * 1.125 });
+      World.add(engine.world, rope);
+    }
+
+    lastXPosition = xPosn - plant.size.avg_width / 4;
     lastPermalink = plant.permalink;
   });
+
+
 });
 
 
 let removedDividers = false;
+const DROP_END_TIME = 4000;
+
 Events.on(engine, 'afterUpdate', (event) => {
-  if(event.timestamp > 3000) {
+  if(event.timestamp > DROP_END_TIME) {
     
     engine.world.gravity.x = 0.0;
-    engine.world.gravity.y = 1;
+    engine.world.gravity.y = 0.01;
     World.add(engine.world, boundaryCap);
   }
-  if(event.timestamp > 3500) {
+  if(event.timestamp > DROP_END_TIME + 500) {
     if(!removedDividers) {
       removedDividers = true;
-      World.remove(engine.world, dividers);
+      // World.remove(engine.world, dividers);
     }
 
-    engine.world.gravity.x = 1;
-    engine.world.gravity.y = 0.0;
-  }
-
-  // Jiggle
-  if(event.timestamp > 5000) {
-    engine.world.gravity.x = -0.5
-    engine.world.gravity.y = -0.5
-  }
-  if(event.timestamp > 5500) {
-    engine.world.gravity.x = 0.5
-    engine.world.gravity.y = -0.5
-  }
-  if(event.timestamp > 6000) {
-    engine.world.gravity.x = 0.5
-    engine.world.gravity.y = 0.5
-  }
-  if(event.timestamp > 6500) {
-    engine.world.gravity.x = -0.5
-    engine.world.gravity.y = 0.5
-  }
-  if(event.timestamp > 7000) {
-    engine.world.gravity.x = 0.0
-    engine.world.gravity.y = 0.5
+    engine.world.gravity.x = 0.0;
+    engine.world.gravity.y = 0.1;
   }
 });
 
