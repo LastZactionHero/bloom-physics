@@ -1,6 +1,9 @@
+// TODO:
+// - Fetch similar plants, filtering by bed width
+// - Fetch only plants with widths
+
 import Matter from 'matter-js';
 import MatterAttractors from 'matter-attractors';
-import CombinationProperties from './combination_properties';
 import $ from 'jquery';
 
 function plantAreaFt2(plant) {
@@ -101,51 +104,26 @@ const combinationTemplates = JSON.parse($.ajax({
 
 // // Pick a random template and identify the plants
 // const template = combinationTemplates[Math.floor(combinationTemplates.length * Math.random())]
-// template-3: poor fit
-// template-4: poor picking
-// template-5: crash
-// template-6: poor picking
-// template-7: looks bad at small scale
-// Where you left off: - Improve plant selection to select by size that will fit
-//                     - Improve position_type picking algorithm 
-const template  = combinationTemplates[4];
-let plants = template.starting_plants.map( (p) => { return p.plant });
+const template  = combinationTemplates[8];
+let plants = template.starting_plants.map( (p) => {
+  const plant = p.plant
+  plant.property_type = { property: p.placement, area: p.area }
+  return plant
+});
+console.log(template)
+
 const colors = ['#1abc9c', '#3498db', '#9b59b6', '#e74c3c']
 plants.forEach( (plant, idx) => {
   plant.renderColor = colors[idx];
   plant.size.area = plantAreaFt2(plant)
 });
 
-// // Pick a random CombiationProperty definition
-// const combinationProperties = CombinationProperties[plants.length][Math.floor(CombinationProperties[plants.length].length * Math.random())]
-const combinationProperties = CombinationProperties[plants.length][0];
-console.log(combinationProperties)
-
-// Self-select plants into properties
-// Randomly assign
-combinationProperties.forEach( (property, idx) => {
-  plants[idx].property_type = property
-});
-
-// Reassign if better
-for(let a = 0; a < plants.length; a++) {
-  for(let b = 0; b < plants.length; b++) {
-    const plantA = plants[a];
-    const plantB = plants[b];
-
-    if(plantA.property_type.property == 'tall_back' && plantB.property_type.property == 'short_front') {
-      // Reverse: Shorter plant is taller
-      if(plantA.size.avg_height < plantB.size.avg_height) {
-        const temp = plantA.property_type
-        plantA.property_type = plantB.property_type
-        plantB.property_type = temp;
-      }
-    }
-  }
-}
+const sortOrder = ['lone', 'tall_back', 'short_front']
 
 // Sort by property type
-plants = plants.sort( (a,b) => { return a.property_type.sort > b.property_type.sort } );
+plants = plants.sort( (a,b) => {
+  return sortOrder.indexOf(a.property_type.property) > sortOrder.indexOf(b.property_type.property)
+});
 
 let inventory = [];
 
@@ -159,8 +137,9 @@ plants.forEach( (plant) => {
     plantQuantity -= 1;
   }
 
+  // Force atleast 1
   if(plantQuantity < 1) {
-    debugger
+    plantQuantity = 1;
   }
 
   let inventoryPlant = []
