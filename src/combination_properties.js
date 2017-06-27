@@ -1,32 +1,32 @@
 export default {
   4: [
       [
-        { property: 'lone', area: 0.25 },
-        { property: 'lone', area: 0.25 },
-        { property: 'tall_back', area: 0.10 },
-        { property: 'short_front', area: 0.05 }
+        { property: 'lone', sort: 0, area: 0.25 },
+        { property: 'lone', sort: 3, area: 0.25 },
+        { property: 'tall_back', sort: 1, area: 0.10 },
+        { property: 'short_front', sort: 2, area: 0.05 }
       ]
   ],
   3: [
       [
-        { property: 'lone', area: 0.50 },
-        { property: 'tall_back', area: 0.10 },
-        { property: 'short_front', area: 0.10 }
+        { property: 'lone', sort: 0, area: 0.50 },
+        { property: 'tall_back', sort: 1, area: 0.10 },
+        { property: 'short_front', sort: 2, area: 0.10 }
       ],
       [
-        { property: 'lone', area: 0.35 },
-        { property: 'lone', area: 0.20 },
-        { property: 'lone', area: 0.20 }
+        { property: 'lone', sort: 0, area: 0.35 },
+        { property: 'lone', sort: 1, area: 0.20 },
+        { property: 'lone', sort: 2, area: 0.20 }
       ]
   ],
   2: [
     [
-      { property: 'tall_back', area: 0.45 },
-      { property: 'short_front', area: 0.25 }
+      { property: 'tall_back', sort: 0, area: 0.65 },
+      { property: 'short_front', sort: 1, area: 0.35 }
     ],
     [
-      { property: 'lone', area: 0.45 },
-      { property: 'lone', area: 0.25 }
+      { property: 'lone', sort: 0, area: 0.45 },
+      { property: 'lone', sort: 1, area: 0.25 }
     ]
   ]
 }

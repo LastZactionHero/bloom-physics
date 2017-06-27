@@ -106,8 +106,9 @@ const combinationTemplates = JSON.parse($.ajax({
 }).responseText);
 
 // // Pick a random template and identify the plants
-const template = combinationTemplates[Math.floor(combinationTemplates.length * Math.random())]
-const plants = template.starting_plants.map( (p) => { return p.plant });
+// const template = combinationTemplates[Math.floor(combinationTemplates.length * Math.random())]
+const template  = combinationTemplates[3];
+let plants = template.starting_plants.map( (p) => { return p.plant });
 const colors = ['#1abc9c', '#3498db', '#9b59b6', '#e74c3c']
 plants.forEach( (plant, idx) => {
   plant.renderColor = colors[idx];
@@ -115,7 +116,9 @@ plants.forEach( (plant, idx) => {
 })
 
 // // Pick a random CombiationProperty definition
-const combinationProperties = CombinationProperties[plants.length][Math.floor(CombinationProperties[plants.length].length * Math.random())]
+// const combinationProperties = CombinationProperties[plants.length][Math.floor(CombinationProperties[plants.length].length * Math.random())]
+const combinationProperties = CombinationProperties[plants.length][0];
+console.log(combinationProperties)
 
 // Self-select plants into properties
 // Randomly assign
@@ -140,6 +143,9 @@ for(let a = 0; a < plants.length; a++) {
   }
 }
 
+// Sort by property type
+plants = plants.sort( (a,b) => { return a.property_type.sort > b.property_type.sort } );
+
 let inventory = [];
 
 // Pick an ideal plant count to fill the space
@@ -152,45 +158,59 @@ plants.forEach( (plant) => {
     plantQuantity -= 1;
   }
 
+  let inventoryPlant = []
   for(var i = 0; i < plantQuantity; i++) {
-    inventory.push(plant.permalink);
+    inventoryPlant.push(plant.permalink);
   }
+
+  inventory.push(inventoryPlant)
 });
 
 
 let dividers = [];
-let lastPermalink = inventory[0];
+let lastPermalink = inventory[0][0];
 let lastXPosition = 0;
 
 const DIVIDER_SIZE = 25;
 
-inventory.forEach( (permalink, inventoryIdx) => {
-  const plant = plants.find( (plant) => { return plant.permalink == permalink});
+inventory.forEach( (inventoryPlant, inventoryPlantIdx) => {
+  inventoryPlant.forEach( (permalink, inventoryIdx) => {
+    const plant = plants.find( (plant) => { return plant.permalink == permalink});
 
-  if(lastPermalink && lastPermalink != plant.permalink) {
-    lastXPosition -= DIVIDER_SIZE;
-    const dividerBody = Bodies.rectangle(lastXPosition, CANVAS_HEIGHT / 2, DIVIDER_SIZE, bedDimensions.depth * 12, { label: 'divider', mass: 10 });
-    dividers.push(dividerBody)
-    World.add(engine.world, dividerBody);
-  
-    lastXPosition - 200;
-  }
-  
-  let xPosn = null;
-  if(lastXPosition == 0) {
-    xPosn = CANVAS_WIDTH / 2 + bedDimensions.width * 12 / 2 - plant.size.avg_width;
-  } else {
-    xPosn = lastXPosition -= plant.size.avg_width;
-  }
+    if(lastPermalink && lastPermalink != plant.permalink) {
+      if(plant.property_type.property == 'short_front') {
 
-  // const yPosn = CANVAS_HEIGHT / 2 + (inventoryIdx % 2 == 0 ? (bedDimensions.depth / 2 + plant.size.avg_width / 2) : (0 - bedDimensions.depth / 2 - plant.size.avg_width / 2));
-  const yPosn = CANVAS_HEIGHT / 2 + ( inventoryIdx % 2 == 0 ? 10 * Math.random() : -10 * Math.random() )
+      } else {
+        lastXPosition -= DIVIDER_SIZE;
+        const dividerBody = Bodies.rectangle(lastXPosition, CANVAS_HEIGHT / 2, DIVIDER_SIZE, bedDimensions.depth * 12, { label: 'divider', mass: 10 });
+        dividers.push(dividerBody)
+        World.add(engine.world, dividerBody);
+      
+        lastXPosition - 200;
+      }
+    }
+    
+    let xPosn = null;
+    if(lastXPosition == 0) {
+      xPosn = CANVAS_WIDTH / 2 + bedDimensions.width * 12 / 2 - plant.size.avg_width;
+    } else {
+      xPosn = lastXPosition -= plant.size.avg_width;
+    }
 
-  const circleBody = Bodies.circle(xPosn, yPosn, plant.size.avg_width / 2, { label: plant.permalink, render: { strokeStyle: plant.renderColor, lineWidth: 1, fillStyle: plant.renderColor}});
-  World.add(engine.world, circleBody);
+    // const yPosn = CANVAS_HEIGHT / 2 + (inventoryIdx % 2 == 0 ? (bedDimensions.depth / 2 + plant.size.avg_width / 2) : (0 - bedDimensions.depth / 2 - plant.size.avg_width / 2));
+    let yPosn = CANVAS_HEIGHT / 2 + ( inventoryIdx % 2 == 0 ? 10 * Math.random() : -10 * Math.random() )
+    if(plant.property_type.property == 'tall_back') {
+      yPosn = CANVAS_HEIGHT / 2 - (bedDimensions.depth * 12 / 2) + plant.size.avg_width / 2;
+    } else if (plant.property_type.property == 'short_front') {
+      yPosn = CANVAS_HEIGHT / 2 + (bedDimensions.depth * 12 / 2) - plant.size.avg_width / 2;
+    }
 
-  lastXPosition = xPosn - plant.size.avg_width;
-  lastPermalink = plant.permalink;
+    const circleBody = Bodies.circle(xPosn, yPosn, plant.size.avg_width / 2, { label: plant.permalink, render: { strokeStyle: plant.renderColor, lineWidth: 1, fillStyle: plant.renderColor}});
+    World.add(engine.world, circleBody);
+
+    lastXPosition = xPosn - plant.size.avg_width;
+    lastPermalink = plant.permalink;
+  });
 });
 
 
