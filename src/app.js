@@ -22,8 +22,8 @@ var Engine = Matter.Engine,
 
 // create an engine
 window.engine = Engine.create();
-engine.world.gravity.x = 0.5;
-engine.world.gravity.y = 0;
+engine.world.gravity.x = 0;
+engine.world.gravity.y = 2;
 
 const CANVAS_WIDTH = 1200;
 const CANVAS_HEIGHT = 1200;
@@ -39,10 +39,10 @@ var render = Render.create({
 });
 
 
-const bedDimensions = { width: 15, depth: 5 } // feet
+const bedDimensions = { width: 30, depth: 6 } // feet
 const bedArea = bedDimensions.width * bedDimensions.depth; // feet^2
 
-const BOUNDARY_BUFFER = 400;
+const BOUNDARY_BUFFER = 100;
 
 const COLOR_CHUTE = "#2c3e50";
 const COLOR_CHUTE_EXT = "#95a5a6";
@@ -53,7 +53,7 @@ const boundaryTop = Bodies.rectangle(
   bedDimensions.width * 12,
   BOUNDARY_BUFFER,
   { isStatic: true, render: { fillStyle: COLOR_CHUTE } });
-World.add(engine.world, boundaryTop);
+// World.add(engine.world, boundaryTop);
 
 const boundaryBottom = Bodies.rectangle(
   CANVAS_WIDTH / 2,
@@ -71,28 +71,13 @@ const boundaryRight= Bodies.rectangle(
   { isStatic: true, render: { fillStyle: COLOR_CHUTE } });
 World.add(engine.world, boundaryRight);
 
-const boundaryExtTop = Bodies.rectangle(
-  CANVAS_WIDTH / 2 - bedDimensions.width * 12,
-  CANVAS_HEIGHT / 2 - bedDimensions.depth * 12 / 2 - BOUNDARY_BUFFER / 2,
-  bedDimensions.width * 12,
-  BOUNDARY_BUFFER,
-  { isStatic: true, render: { fillStyle: COLOR_CHUTE_EXT } });
-World.add(engine.world, boundaryExtTop);
-
-const boundaryExtBottom = Bodies.rectangle(
-  CANVAS_WIDTH / 2 - bedDimensions.width * 12,
-  CANVAS_HEIGHT / 2 + bedDimensions.depth * 12 / 2 + BOUNDARY_BUFFER / 2,
-  bedDimensions.width * 12,
-  BOUNDARY_BUFFER,
-  { isStatic: true, render: { fillStyle: COLOR_CHUTE_EXT } });
-World.add(engine.world, boundaryExtBottom);
-
-const boundaryCap = Bodies.rectangle(
-  CANVAS_WIDTH / 2 - bedDimensions.width * 12,
+const boundaryLeft= Bodies.rectangle(
+  CANVAS_WIDTH / 2 - BOUNDARY_BUFFER / 2 - bedDimensions.width * 12 / 2,
   CANVAS_HEIGHT / 2,
-  bedDimensions.width * 12,
-  bedDimensions.depth * 12,
+  BOUNDARY_BUFFER,
+  BOUNDARY_BUFFER * 2 + bedDimensions.depth * 12,
   { isStatic: true, render: { fillStyle: COLOR_CHUTE } });
+World.add(engine.world, boundaryLeft);
 
 
 // // Load Combination Templates from API
@@ -104,141 +89,146 @@ const combinationTemplates = JSON.parse($.ajax({
 
 // // Pick a random template and identify the plants
 // const template = combinationTemplates[Math.floor(combinationTemplates.length * Math.random())]
-const template  = combinationTemplates[8];
-let plants = template.starting_plants.map( (p) => {
-  const plant = p.plant
-  plant.property_type = { property: p.placement, area: p.area }
-  return plant
-});
+const template  = combinationTemplates[4];
+// let plants = template.starting_plants.map( (p) => {
+//   const plant = p.plant
+//   plant.property_type = { property: p.placement, area: p.area }
+//   return plant
+// });
 console.log(template)
 
-const colors = ['#1abc9c', '#3498db', '#9b59b6', '#e74c3c']
-plants.forEach( (plant, idx) => {
-  plant.renderColor = colors[idx];
-  plant.size.area = plantAreaFt2(plant)
+// Group into horizontal segments
+let horizontalGroups = [];
+let groupLayered = [];
+template.starting_plants.forEach( (templatePlant) => {
+  if(templatePlant.placement == 'lone') {
+    horizontalGroups.push({type: 'single', templatePlants: [templatePlant]});
+  }
+  if(templatePlant.placement == 'short_front' || templatePlant.placement == 'tall_back') {
+    groupLayered.push(templatePlant);
+  }
+});
+if(groupLayered.length > 1) {
+  if(groupLayered[0].placement == 'tall_back') {
+    const tmp = groupLayered.shift();
+    groupLayered.push(tmp);
+  }
+  horizontalGroups.push({type: 'layered', templatePlants: groupLayered});
+}
+
+// Determine the number of plants for each template plant
+horizontalGroups.forEach( (horizontalGroup) => {
+  horizontalGroup.templatePlants.forEach( (templatePlant) => {
+    let plantArea = plantAreaFt2(templatePlant.plant);
+    let plantCount = Math.floor((templatePlant.area * bedArea) / plantArea);
+
+    if(plantCount % 2 == 0) {
+      plantCount -= 1;
+    }
+    templatePlant.plant_count = plantCount
+  })
+})
+
+// Determine the approximate width proportion needed by each horizontal group based on the area used by their plants
+horizontalGroups.forEach( (horizontalGroup) => {
+  horizontalGroup.area = horizontalGroup.templatePlants.reduce( (sum, templatePlant) => { return sum + templatePlant.area}, 0)
 });
 
-const sortOrder = ['lone', 'tall_back', 'short_front']
-
-// Sort by property type
-plants = plants.sort( (a,b) => {
-  return sortOrder.indexOf(a.property_type.property) > sortOrder.indexOf(b.property_type.property)
+const totalAllocatedBedArea =  horizontalGroups.reduce( (sum, horizontalGroup) => { return sum + horizontalGroup.area }, 0)
+horizontalGroups.forEach( (horizontalGroup) => {
+  horizontalGroup.proportional_area = horizontalGroup.area / totalAllocatedBedArea;
 });
 
-let inventory = [];
+let dividers = []
+// Build dividers to separate groups during drop in
+let lastDividedXAbsolute = (CANVAS_WIDTH / 2) - (bedDimensions.width * 12 / 2);
+horizontalGroups.forEach( (horizontalGroup, idx) => {
+  if(idx < (horizontalGroups.length - 1)) {
+    const dividerXRelative = bedDimensions.width * horizontalGroup.proportional_area;
+    const dividerXAbsolute = (CANVAS_WIDTH / 2) - (bedDimensions.width * 12 / 2) + dividerXRelative * 12
 
-// Pick an ideal plant count to fill the space
-plants.forEach( (plant) => {
-  const plantAreaToFill = plant.property_type.area * bedArea
-  let plantQuantity = Math.floor(plantAreaToFill / plant.size.area)
+    const divider = Bodies.rectangle(
+      dividerXAbsolute,
+      CANVAS_WIDTH / 2,
+      4,
+      bedDimensions.depth * 12,
+      { mass: 10, isStatic: true, render: { fillStyle: COLOR_CHUTE } });
+    World.add(engine.world, divider);
+    dividers.push(divider)
 
-  // Odd numbers
-  if(plantQuantity > 1 && plantQuantity % 2 == 0) {
-    plantQuantity -= 1;
+    // Save X absolute positions in horizontalGroup
+    horizontalGroup.position_range = { xStartAbsolute: lastDividedXAbsolute, xEndAbsolute: dividerXAbsolute}
+    lastDividedXAbsolute = dividerXAbsolute;
+  } else {
+    // Save X absolute positions in horizontalGroup
+    horizontalGroup.position_range = { xStartAbsolute: lastDividedXAbsolute, xEndAbsolute: (CANVAS_WIDTH / 2) + (bedDimensions.width * 12 / 2)}
   }
-
-  // Force atleast 1
-  if(plantQuantity < 1) {
-    plantQuantity = 1;
-  }
-
-  let inventoryPlant = []
-  for(var i = 0; i < plantQuantity; i++) {
-    inventoryPlant.push(plant.permalink);
-  }
-
-  inventory.push(inventoryPlant)
 });
 
+// Assign render colors
+let colors = ['#1abc9c', '#3498db', '#9b59b6', '#e74c3c']
+horizontalGroups.forEach( (horizontalGroup) => {
+  horizontalGroup.templatePlants.forEach( (templatePlant) => {
+    templatePlant.render_color = colors.pop();
+  })
+});
 
-let dividers = [];
-let lastPermalink = inventory[0][0];
-let lastXPosition = 0;
-let tallBackStartXPosition = 0;
-const DIVIDER_SIZE = 20;
+let layer = 0;
+horizontalGroups.forEach( (horizontalGroup) => {
+  let yAbsolute = CANVAS_HEIGHT / 2 - 100 - bedDimensions.depth * 12;
+  let xAbsolute = horizontalGroup.position_range.xStartAbsolute + horizontalGroup.templatePlants[0].plant.size.avg_width / 2 + 1;
 
-inventory.forEach( (inventoryPlant, inventoryPlantIdx) => {
-  let rope = Composites.stack();
+  horizontalGroup.templatePlants.forEach( (templatePlant) => {
+    const plant = templatePlant.plant;
+    yAbsolute -= 100;
 
-  inventoryPlant.forEach( (permalink, inventoryIdx) => {
-    const plant = plants.find( (plant) => { return plant.permalink == permalink});
+    // let xCenterAbsolute = (horizontalGroup.position_range.xStartAbsolute + horizontalGroup.position_range.xEndAbsolute) / 2
+    for( let i = 0; i < templatePlant.plant_count; i++ ) {
+      let airFriction = null;
+      if(templatePlant.placement == 'short_front') {
 
-    if(lastPermalink && lastPermalink != plant.permalink) {
-      if(plant.property_type.property == 'short_front') {
-        lastXPosition = tallBackStartXPosition;
-      } else {
-        lastXPosition -= DIVIDER_SIZE;
-        const dividerBody = Bodies.rectangle(lastXPosition, CANVAS_HEIGHT / 2, DIVIDER_SIZE, bedDimensions.depth * 12, { label: 'divider', mass: 10 });
-        dividers.push(dividerBody)
-        World.add(engine.world, dividerBody);
-      
-        lastXPosition - 200;
+      } else if(templatePlant.placement == 'tall_back') {
+        airFriction = 0.1
       }
-    }
-    
-    let xPosn = null;
-    if(lastXPosition == 0) {
-      xPosn = CANVAS_WIDTH / 2 + bedDimensions.width * 12 / 2 - plant.size.avg_width;
-    } else {
-      xPosn = lastXPosition -= plant.size.avg_width;
-    }
 
-    if(lastPermalink != plant.permalink && plant.property_type.property == 'tall_back') {
-      tallBackStartXPosition = xPosn;
-    }
-
-    let yPosn = CANVAS_HEIGHT / 2 + ( inventoryIdx % 2 == 0 ? 10 * Math.random() : -10 * Math.random() )
-    if(plant.property_type.property == 'tall_back') {
-      yPosn = CANVAS_HEIGHT / 2 - (bedDimensions.depth * 12 / 2) + plant.size.avg_width / 2;
-      if(inventoryIdx % 2 == 0) {
-        yPosn += plant.size.avg_width / 2;
-      }
-    } else if (plant.property_type.property == 'short_front') {
-      if(inventoryIdx % 2 == 0) {
-        yPosn += plant.size.avg_width / 2;
-      }
-      yPosn = CANVAS_HEIGHT / 2 + (bedDimensions.depth * 12 / 2) - plant.size.avg_width / 2;
-    }
-
-    const circleBody = Bodies.circle(xPosn, yPosn, plant.size.avg_width / 2, { label: plant.permalink, render: { strokeStyle: plant.renderColor, lineWidth: 1, fillStyle: plant.renderColor}});
-
-    if(plant.property_type.property == 'tall_back' || plant.property_type.property == 'short_front') {
-      rope.bodies.push(circleBody);
-    } else {
+      const xCenterAbsolute = (horizontalGroup.position_range.xStartAbsolute + horizontalGroup.position_range.xEndAbsolute) / 2
+      const xPosn = xCenterAbsolute + (i % 2 == 0 ? -1 : 1) * plant.size.avg_width / 2 + (layer % 2 == 0 ? 0 : plant.size.avg_width / 4) + Math.random() * 3;
+      console.log(xPosn)
+      const circleBody = Bodies.circle(xPosn, yAbsolute, plant.size.avg_width / 2, { frictionAir: airFriction, label: plant.permalink, render: { strokeStyle: templatePlant.render_color, lineWidth: 1, fillStyle: templatePlant.render_color}});
       World.add(engine.world, circleBody);
-    }
-    
-    if(rope.bodies.length > 0 && inventoryIdx == inventoryPlant.length - 1) {
-      Composites.chain(rope, 0, 0, 0, 0, { stiffness: 0.2, length: plant.size.avg_width * 1.125 });
-      World.add(engine.world, rope);
-    }
 
-    lastXPosition = xPosn - plant.size.avg_width / 4;
-    lastPermalink = plant.permalink;
+      yAbsolute -= plant.size.avg_width;
+      xAbsolute += plant.size.avg_width * 1;
+      if((xAbsolute + plant.size.avg_width / 2) > horizontalGroup.position_range.xEndAbsolute) {
+        xAbsolute = horizontalGroup.position_range.xStartAbsolute + plant.size.avg_width / (layer % 2 == 0 ? 1 : 2);
+        yAbsolute -= plant.size.avg_width * 2;
+        layer += 1;
+      }
+
+    }
   });
-
-
 });
+
 
 
 let removedDividers = false;
-const DROP_END_TIME = 4000;
+const DROP_END_TIME = 6000;
 
 Events.on(engine, 'afterUpdate', (event) => {
   if(event.timestamp > DROP_END_TIME) {
-    
-    engine.world.gravity.x = 0.0;
-    engine.world.gravity.y = 0.01;
-    World.add(engine.world, boundaryCap);
+    World.add(engine.world, boundaryTop);
+    engine.world.gravity.y = 5;
+    // World.remove(engine.world, dividers);
   }
   if(event.timestamp > DROP_END_TIME + 500) {
-    if(!removedDividers) {
-      removedDividers = true;
-      // World.remove(engine.world, dividers);
-    }
-
-    engine.world.gravity.x = 0.0;
-    engine.world.gravity.y = 0.1;
+    engine.world.gravity.x = 10;
+  } 
+  if(event.timestamp > DROP_END_TIME + 525) {
+    engine.world.gravity.x = -10;
+  } 
+  if(event.timestamp > DROP_END_TIME + 550) {
+    engine.world.gravity.x = 0;
+    dividers.forEach( (d) => { d.isStatic = false });
   }
 });
 
